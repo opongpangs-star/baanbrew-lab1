@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+.env.*
+*.local
+# ห้าม commit service account key ของ Firebase เด็ดขาด
+*-firebase-adminsdk-*.json
+serviceAccount*.json

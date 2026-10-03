@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* โทนสีร้านกาแฟ: ครีม/น้ำตาลคั่ว — ใช้ผ่าน class เช่น bg-cream text-roast */
+@theme {
+  --font-sans: "IBM Plex Sans Thai", system-ui, sans-serif;
+  --color-cream: #faf6ef;
+  --color-foam: #f1e8da;
+  --color-latte: #d9c3a5;
+  --color-caramel: #b07a45;
+  --color-roast: #6b4226;
+  --color-espresso: #2b1d14;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-espresso);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Recharts: ปิดกรอบโฟกัสสี่เหลี่ยมตอนคลิกกราฟ */
+.recharts-wrapper *:focus { outline: none; }
