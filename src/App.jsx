@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 import {
-  ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, LabelList,
+  ResponsiveContainer, LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, LabelList,
 } from "recharts";
 import {
   parseRows, computeKpis, dailySales, salesByBranch, billsByHour, branchNames,
   fmtBaht, fmtBaht2, fmtNum, fmtCompactBaht, fmtThaiDate, fmtThaiMonth, fmtThaiDateLong,
 } from "./lib/metrics.js";
+import CustomerSection from "./components/CustomerSection.jsx";
+import { Centered, Card, Kpi, Segmented, ChartTooltip } from "./components/ui.jsx";
 
 const ALL = "ทุกสาขา";
 const BRANCH_TYPE = { สยาม: "ห้าง", สีลม: "ออฟฟิศ", อารีย์: "ชุมชน", บางนา: "ห้าง", มหาวิทยาลัย: "สถานศึกษา" };
@@ -16,12 +18,15 @@ const RANGES = [
   { key: "90", label: "90 วัน", days: 90 },
 ];
 const C = { roast: "#6b4226", caramel: "#b07a45", latte: "#d9c3a5", grid: "#ece2d3", axis: "#8a7563" };
-const REPO_URL = "https://github.com/opongpangs-star/baanbrew-lab1";
+export const REPO_URL = "https://github.com/opongpangs-star/baanbrew-lab1";
+export const COLORS = C;
+const VIEWS = [{ key: "sales", label: "📈 ยอดขาย" }, { key: "customers", label: "👥 ลูกค้า" }];
 
 export default function App() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
   const [branch, setBranch] = useState(ALL);
+  const [view, setView] = useState("sales");
 
   useEffect(() => {
     Papa.parse(`${import.meta.env.BASE_URL}sales.csv`, {
@@ -35,10 +40,10 @@ export default function App() {
 
   if (error) return <Centered>⚠️ โหลดข้อมูลไม่สำเร็จ: {error}</Centered>;
   if (!rows) return <Centered><span className="animate-pulse">☕ กำลังชงข้อมูล 53,000 แถว…</span></Centered>;
-  return <Dashboard rows={rows} branch={branch} setBranch={setBranch} />;
+  return <Dashboard rows={rows} branch={branch} setBranch={setBranch} view={view} setView={setView} />;
 }
 
-function Dashboard({ rows, branch, setBranch }) {
+function Dashboard({ rows, branch, setBranch, view, setView }) {
   const branches = useMemo(() => salesByBranch(rows).map((b) => b.branch), [rows]);
   const filtered = useMemo(() => (branch === ALL ? rows : rows.filter((r) => r.branch === branch)), [rows, branch]);
   const kpis = useMemo(() => computeKpis(filtered), [filtered]);
@@ -51,15 +56,16 @@ function Dashboard({ rows, branch, setBranch }) {
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-caramel">Lab 1 · Basic Data Analytics</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-caramel">Lab 1 + Lab 2.1 · Basic Data Analytics</p>
           <h1 className="mt-1 flex items-center gap-2 text-3xl font-bold text-espresso">
             <span aria-hidden>☕</span> บ้านบรู Dashboard
           </h1>
           <p className="mt-1 text-sm text-roast/80">
-            ภาพรวมยอดขาย {branch === ALL ? `${branchNames(rows).length} สาขา` : `สาขา${branch}`} ·{" "}
+            {view === "sales" ? "ภาพรวมยอดขาย" : "ภาพรวมลูกค้าสมาชิก"} {branch === ALL ? `${branchNames(rows).length} สาขา` : `สาขา${branch}`} ·{" "}
             {firstDate && `${fmtThaiDate(firstDate)} – ${fmtThaiDate(lastDate)}`}
           </p>
         </div>
+        <Segmented label="มุมมอง" options={VIEWS} value={view} onChange={setView} />
       </header>
 
       <nav aria-label="เลือกสาขา" className="sticky top-0 z-10 -mx-4 mt-5 flex gap-2 overflow-x-auto bg-cream/90 px-4 py-3 backdrop-blur sm:mx-0 sm:px-0">
@@ -78,92 +84,34 @@ function Dashboard({ rows, branch, setBranch }) {
         ))}
       </nav>
 
-      <section aria-label="ตัวชี้วัดหลัก" className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon="💰" label="ยอดขายรวม" value={fmtBaht(kpis.totalSales)} hint="ผลรวม qty × unit_price" />
-        <Kpi icon="🧾" label="จำนวนบิล" value={fmtNum(kpis.bills)} hint={`order_id ไม่ซ้ำ (จาก ${fmtNum(kpis.rows)} แถว)`} />
-        <Kpi icon="☕" label="ยอดเฉลี่ยต่อบิล" value={fmtBaht2(kpis.avgPerBill)} hint="ยอดขายรวม ÷ จำนวนบิล" />
-        <Kpi icon="👥" label="ลูกค้าสมาชิก" value={fmtNum(kpis.members)} hint="customer_id ไม่ซ้ำ ไม่นับค่าว่าง" />
-      </section>
-
-      <DailyChart daily={daily} />
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <BranchChart rows={rows} selected={branch} onSelect={setBranch} />
-        <HourlyChart hourly={hourly} branch={branch} />
-      </div>
-
-      <Observations rows={rows} />
-      <VerifyPanel rows={rows} />
+      {view === "sales" ? (
+        <>
+          <section aria-label="ตัวชี้วัดหลัก" className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Kpi icon="💰" label="ยอดขายรวม" value={fmtBaht(kpis.totalSales)} hint="ผลรวม qty × unit_price" />
+            <Kpi icon="🧾" label="จำนวนบิล" value={fmtNum(kpis.bills)} hint={`order_id ไม่ซ้ำ (จาก ${fmtNum(kpis.rows)} แถว)`} />
+            <Kpi icon="☕" label="ยอดเฉลี่ยต่อบิล" value={fmtBaht2(kpis.avgPerBill)} hint="ยอดขายรวม ÷ จำนวนบิล" />
+            <Kpi icon="👥" label="ลูกค้าสมาชิก" value={fmtNum(kpis.members)} hint="customer_id ไม่ซ้ำ ไม่นับค่าว่าง" />
+          </section>
+    
+          <DailyChart daily={daily} />
+    
+          <div className="mt-4 grid gap-4 lg:grid-cols-5">
+            <BranchChart rows={rows} selected={branch} onSelect={setBranch} />
+            <HourlyChart hourly={hourly} branch={branch} />
+          </div>
+    
+          <Observations rows={rows} />
+          <VerifyPanel rows={rows} />
+        </>
+      ) : (
+        <CustomerSection salesRows={filtered} branch={branch} onSelectBranch={setBranch} />
+      )}
 
       <footer className="mt-10 border-t border-latte/60 pt-5 text-center text-xs text-roast/70">
         ข้อมูล {fmtNum(rows.length)} แถว · {branches.length} สาขา · {dailySales(rows).length} วัน (sales.csv ร้านกาแฟบ้านบรู) ·
         สร้างด้วย React + Vite + Tailwind + Recharts + PapaParse ·{" "}
         <a className="underline hover:text-roast" href={REPO_URL} target="_blank" rel="noreferrer">โค้ดบน GitHub</a>
       </footer>
-    </div>
-  );
-}
-
-function Centered({ children }) {
-  return <div className="grid min-h-screen place-items-center p-6 text-lg text-roast">{children}</div>;
-}
-
-function Card({ title, sub, children, className = "", action }) {
-  return (
-    <section className={`min-w-0 rounded-2xl border border-latte/50 bg-white p-4 shadow-sm sm:p-5 ${className}`}>
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold text-espresso">{title}</h2>
-          {sub && <p className="text-sm text-roast/70">{sub}</p>}
-        </div>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Kpi({ icon, label, value, hint }) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-latte/50 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between text-sm font-medium text-roast/80">
-        {label}
-        <span aria-hidden className="grid h-8 w-8 place-items-center rounded-full bg-foam">{icon}</span>
-      </div>
-      <div className="mt-2 text-2xl font-bold tabular-nums text-espresso sm:text-3xl">{value}</div>
-      <div className="mt-1 text-xs text-roast/60">{hint}</div>
-    </div>
-  );
-}
-
-function Segmented({ options, value, onChange, label }) {
-  return (
-    <div role="group" aria-label={label} className="flex rounded-full bg-foam p-1 text-xs font-medium">
-      {options.map((o) => (
-        <button
-          key={o.key}
-          onClick={() => onChange(o.key)}
-          aria-pressed={value === o.key}
-          className={`rounded-full px-3 py-1 transition ${value === o.key ? "bg-white text-espresso shadow" : "text-roast/70 hover:text-roast"}`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ChartTooltip({ active, payload, label, labelFormatter, valueFormatter }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-xl border border-latte bg-white/95 px-3 py-2 text-sm shadow-lg">
-      <div className="mb-1 font-semibold text-espresso">{labelFormatter ? labelFormatter(label) : label}</div>
-      {payload.filter((p) => p.value != null).map((p) => (
-        <div key={p.dataKey} className="flex items-center gap-2 text-roast">
-          <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
-          {p.name}: <b className="tabular-nums">{valueFormatter(p.value, p.dataKey)}</b>
-        </div>
-      ))}
     </div>
   );
 }

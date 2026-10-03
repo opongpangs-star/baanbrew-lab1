@@ -118,3 +118,88 @@ const toDate = (iso) => new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)
 export const fmtThaiDate = (iso) => thShort.format(toDate(iso));
 export const fmtThaiMonth = (iso) => thMonth.format(toDate(iso));
 export const fmtThaiDateLong = (iso) => thLong.format(toDate(iso));
+
+// ======================= ข้อมูลลูกค้า (customers_clean.csv จาก notebook Lab 2.1) =======================
+export const AGE_ORDER = ["ต่ำกว่า 18", "18-24", "25-34", "35-44", "45-54", "55+"];
+export const GENDERS = ["หญิง", "ชาย", "ไม่ระบุ"];
+
+// แปลงแถวจาก CSV: ธง True/False เป็น boolean, ตัวเลขเป็น Number
+export function parseCustomers(raw) {
+  const bool = (v) => String(v).trim() === "True";
+  return raw
+    .filter((r) => r.customer_id)
+    .map((r) => ({
+      id: r.customer_id,
+      gender: r.gender,
+      ageGroup: r.age_group,
+      branch: r.home_branch,
+      joined: r.joined_date || "", // "YYYY-MM-DD" หรือว่าง
+      phoneShared: bool(r.phone_shared),
+      isMinor: bool(r.is_minor),
+      hasPurchase: bool(r.has_purchase),
+      orders: Number(r.orders) || 0,
+      spend: Number(r.total_spend) || 0,
+      topBranch: r.top_branch || "",
+    }));
+}
+
+// KPI ลูกค้า
+// - members: สมาชิกทั้งหมด, buyers: เคยซื้ออย่างน้อย 1 บิล
+// - spendPerBuyer: ยอดซื้อรวมของสมาชิก ÷ จำนวนสมาชิกที่เคยซื้อ (ไม่หารคนที่ไม่เคยซื้อ)
+// - memberSalesShare: ยอดขายที่มี customer_id ÷ ยอดขายทั้งหมด (คำนวณจาก sales ไม่ใช่จาก customers)
+export function customerKpis(customers, salesRows) {
+  const buyers = customers.filter((c) => c.hasPurchase);
+  const spend = buyers.reduce((s, c) => s + c.spend, 0);
+  let memberSales = 0, total = 0;
+  for (const r of salesRows) {
+    total += r.revenue;
+    if (r.customerId) memberSales += r.revenue;
+  }
+  return {
+    members: customers.length,
+    buyers: buyers.length,
+    buyerRate: customers.length ? buyers.length / customers.length : 0,
+    spendPerBuyer: buyers.length ? spend / buyers.length : 0,
+    ordersPerBuyer: buyers.length ? buyers.reduce((s, c) => s + c.orders, 0) / buyers.length : 0,
+    memberSalesShare: total ? memberSales / total : 0,
+  };
+}
+
+// สมาชิกใหม่รายเดือน + สะสม — เดือนสุดท้ายถ้าข้อมูลไม่ครบเดือนจะติดธง partial (ไม่ให้ดูเหมือนยอดตก)
+export function newMembersByMonth(customers, dataEnd = "2026-09-20") {
+  const m = new Map();
+  for (const c of customers) if (c.joined) m.set(c.joined.slice(0, 7), (m.get(c.joined.slice(0, 7)) || 0) + 1);
+  let cum = 0;
+  const lastDay = new Date(Number(dataEnd.slice(0, 4)), Number(dataEnd.slice(5, 7)), 0).getDate();
+  return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([month, n]) => {
+    cum += n;
+    const partial = month === dataEnd.slice(0, 7) && Number(dataEnd.slice(8, 10)) < lastDay;
+    return { month, date: `${month}-01`, newMembers: n, cumulative: cum, partial };
+  });
+}
+
+// สมาชิกแยกสาขาประจำ: ซื้อแล้ว / ยังไม่เคยซื้อ + อัตราการซื้อ
+export function membersByBranch(customers) {
+  const m = new Map();
+  for (const c of customers) {
+    const b = m.get(c.branch) || { branch: c.branch, bought: 0, notYet: 0 };
+    c.hasPurchase ? b.bought++ : b.notYet++;
+    m.set(c.branch, b);
+  }
+  return [...m.values()]
+    .map((b) => ({ ...b, total: b.bought + b.notYet, rate: b.bought / (b.bought + b.notYet) }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// กลุ่มอายุ × เพศ (จำนวนคน) + ยอดซื้อเฉลี่ยต่อคนที่เคยซื้อ
+export function ageProfile(customers) {
+  return AGE_ORDER.map((age) => {
+    const group = customers.filter((c) => c.ageGroup === age);
+    const buyers = group.filter((c) => c.hasPurchase);
+    const row = { age, total: group.length, avgSpend: buyers.length ? Math.round(buyers.reduce((s, c) => s + c.spend, 0) / buyers.length) : 0 };
+    for (const g of GENDERS) row[g] = group.filter((c) => c.gender === g).length;
+    return row;
+  });
+}
+
+export const fmtPct = (x, d = 1) => `${(x * 100).toFixed(d)}%`;

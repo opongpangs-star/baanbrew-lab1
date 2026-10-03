@@ -8,3 +8,11 @@ console.log(computeKpis(rows));
 console.table(salesByBranch(rows));
 const d = dailySales(rows); console.log("days", d.length, d[0], d.at(-1));
 console.table(billsByHour(rows));
+
+// ---- ลูกค้า (การบ้าน Lab 2.1) ----
+import { parseCustomers, customerKpis, membersByBranch, ageProfile, newMembersByMonth } from "./src/lib/metrics.js";
+const cust = parseCustomers(Papa.parse(readFileSync("public/customers_clean.csv", "utf8"), { header: true, skipEmptyLines: true }).data);
+console.log(customerKpis(cust, rows));
+console.table(membersByBranch(cust));
+console.table(ageProfile(cust));
+const nm = newMembersByMonth(cust); console.log("months", nm.length, nm.at(-1));

@@ -1,4 +1,4 @@
-# ☕ บ้านบรู Dashboard — Lab 1
+# ☕ บ้านบรู Dashboard — Lab 1 + การบ้าน Lab 2.1
 
 Dashboard ยอดขายร้านกาแฟ "บ้านบรู" 5 สาขา (1 เม.ย. 2568 – 20 ก.ย. 2569)
 งาน Lab 1 วิชา Basic Data Analytics and Data Visualization using AI Vibe Coding
@@ -66,3 +66,25 @@ node verify.mjs  # พิมพ์ตัวเลขสำหรับตรว�
 ```
 
 เครื่องมือ: React · Vite · Tailwind CSS · Recharts · PapaParse — ขึ้นเว็บด้วย `npm run deploy` (build แล้วส่ง `dist/` ขึ้น branch `gh-pages` ของ GitHub Pages)
+
+---
+
+## การบ้านที่ 2 — Data Profiling ข้อมูลลูกค้า (ต่อยอด Lab 2.1)
+
+📓 **Notebook:** [`notebooks/Lab2_1_Customers_Data_Profiling.ipynb`](notebooks/Lab2_1_Customers_Data_Profiling.ipynb) ·
+[เปิดใน Google Colab](https://colab.research.google.com/github/opongpangs-star/baanbrew-lab1/blob/main/notebooks/Lab2_1_Customers_Data_Profiling.ipynb)
+
+ขั้นตอนใน notebook: โหลดข้อมูล → profiling รายคอลัมน์ → ตรวจความผิดปกติ 24 ข้อ (รูปแบบ / ความสมเหตุสมผล / ตรวจไขว้กับ sales.csv) → รายงานเป็นตารางก่อนแก้ → ทำความสะอาดพร้อมบันทึกการตัดสินใจ → `assert` ตรวจผล → export `customers_clean.csv`
+
+ผลกับ `customers.csv` ชุดนี้ (3,000 คน): รูปแบบข้อมูลผ่านทุกข้อ (ไม่มีแถวซ้ำ รหัสซ้ำ วันที่ผิดรูปแบบ) พบประเด็นเชิงธุรกิจที่ **ติดธงไว้ ไม่ลบทิ้ง**
+
+| ประเด็น | จำนวน | ทำอะไร |
+|---|---|---|
+| สมาชิกที่ไม่เคยซื้อ | 493 (16.4%) | ธง `has_purchase=False` → กลุ่มเป้าหมายโปรฯ แก้วแรก |
+| อายุต่ำกว่า 18 | 113 (3.8%) | ธง `is_minor` → ต้องมีความยินยอมผู้ปกครอง (PDPA) |
+| สาขาประจำ ≠ สาขาที่ซื้อบ่อยสุด | 107 (3.6%) | เพิ่มคอลัมน์ `top_branch` |
+| เบอร์โทรซ้ำกับคนอื่น | 99 (3.3%) | ธง `phone_shared` → ให้ทีม CRM ตรวจ |
+
+ตัวทำความสะอาดรองรับข้อมูลดิบที่เลอะด้วย (ปี พ.ศ., DD/MM/YYYY, ช่องว่าง, คำพ้องเพศ/อายุ, แถวซ้ำ, รหัสซ้ำ, เบอร์ไม่ปิดบัง) — ทดสอบกับไฟล์ทดสอบที่ใส่ปัญหาเหล่านี้แล้ว ถ้ามี `customers.csv` ต้นฉบับจากคอร์ส ให้อัปโหลดในแถบ Files ของ Colab แล้ว Run all
+
+**บน Dashboard:** สลับไปที่แท็บ **👥 ลูกค้า** — ผล profiling, KPI ลูกค้า, สมาชิกใหม่รายเดือน (เดือนสุดท้ายที่ไม่ครบเดือนแสดงเป็นแท่งจาง), สมาชิกแยกสาขา ซื้อแล้ว/ยังไม่ซื้อ, กลุ่มอายุ × เพศ, ยอดซื้อเฉลี่ยตามกลุ่มอายุ และข้อสังเกต 4 ข้อ (กรองตามสาขาได้)
