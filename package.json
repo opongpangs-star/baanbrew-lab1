@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "node deploy.mjs"
+    "deploy": "node deploy.mjs",
+    "seed": "node --env-file=.env.local scripts/seed-firestore.mjs",
+    "test:rules": "node --env-file=.env.local scripts/test-rules.mjs"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "papaparse": "^5.7.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -18,6 +21,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
+    "firebase-admin": "^14.5.0",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.2"
   }

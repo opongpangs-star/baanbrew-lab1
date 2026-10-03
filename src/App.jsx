@@ -8,6 +8,8 @@ import {
   fmtBaht, fmtBaht2, fmtNum, fmtCompactBaht, fmtThaiDate, fmtThaiMonth, fmtThaiDateLong,
 } from "./lib/metrics.js";
 import CustomerSection from "./components/CustomerSection.jsx";
+import RealtimeSection from "./components/RealtimeSection.jsx";
+import { firebaseReady, useAuthUser, signInWithGoogle, logOut, firebaseErrorText } from "./lib/firebase.js";
 import { Centered, Card, Kpi, Segmented, ChartTooltip } from "./components/ui.jsx";
 
 const ALL = "ทุกสาขา";
@@ -20,13 +22,14 @@ const RANGES = [
 const C = { roast: "#6b4226", caramel: "#b07a45", latte: "#d9c3a5", grid: "#ece2d3", axis: "#8a7563" };
 export const REPO_URL = "https://github.com/opongpangs-star/baanbrew-lab1";
 export const COLORS = C;
-const VIEWS = [{ key: "sales", label: "📈 ยอดขาย" }, { key: "customers", label: "👥 ลูกค้า" }];
+const VIEWS = [{ key: "sales", label: "📈 ยอดขาย" }, { key: "customers", label: "👥 ลูกค้า" }, { key: "realtime", label: "⚡ Real-time" }];
 
 export default function App() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
   const [branch, setBranch] = useState(ALL);
-  const [view, setView] = useState("sales");
+  const [view, setView] = useState(() => (location.hash === "#realtime" ? "realtime" : "sales"));
+  const user = useAuthUser();
 
   useEffect(() => {
     Papa.parse(`${import.meta.env.BASE_URL}sales.csv`, {
@@ -40,10 +43,10 @@ export default function App() {
 
   if (error) return <Centered>⚠️ โหลดข้อมูลไม่สำเร็จ: {error}</Centered>;
   if (!rows) return <Centered><span className="animate-pulse">☕ กำลังชงข้อมูล 53,000 แถว…</span></Centered>;
-  return <Dashboard rows={rows} branch={branch} setBranch={setBranch} view={view} setView={setView} />;
+  return <Dashboard rows={rows} branch={branch} setBranch={setBranch} view={view} setView={setView} user={user} />;
 }
 
-function Dashboard({ rows, branch, setBranch, view, setView }) {
+function Dashboard({ rows, branch, setBranch, view, setView, user }) {
   const branches = useMemo(() => salesByBranch(rows).map((b) => b.branch), [rows]);
   const filtered = useMemo(() => (branch === ALL ? rows : rows.filter((r) => r.branch === branch)), [rows, branch]);
   const kpis = useMemo(() => computeKpis(filtered), [filtered]);
@@ -56,16 +59,19 @@ function Dashboard({ rows, branch, setBranch, view, setView }) {
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-caramel">Lab 1 + Lab 2.1 · Basic Data Analytics</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-caramel">Lab 1 · Lab 2.1 · Lab 3 · Basic Data Analytics</p>
           <h1 className="mt-1 flex items-center gap-2 text-3xl font-bold text-espresso">
             <span aria-hidden>☕</span> บ้านบรู Dashboard
           </h1>
           <p className="mt-1 text-sm text-roast/80">
-            {view === "sales" ? "ภาพรวมยอดขาย" : "ภาพรวมลูกค้าสมาชิก"} {branch === ALL ? `${branchNames(rows).length} สาขา` : `สาขา${branch}`} ·{" "}
-            {firstDate && `${fmtThaiDate(firstDate)} – ${fmtThaiDate(lastDate)}`}
+            {{ sales: "ภาพรวมยอดขาย", customers: "ภาพรวมลูกค้าสมาชิก", realtime: "ยอดขายแบบ real-time จาก Firestore" }[view]} {branch === ALL ? `${branchNames(rows).length} สาขา` : `สาขา${branch}`} ·{" "}
+            {view === "realtime" ? "อัปเดตทันทีเมื่อมีการบันทึก" : firstDate && `${fmtThaiDate(firstDate)} – ${fmtThaiDate(lastDate)}`}
           </p>
         </div>
-        <Segmented label="มุมมอง" options={VIEWS} value={view} onChange={setView} />
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <AuthChip user={user} />
+          <Segmented label="มุมมอง" options={VIEWS} value={view} onChange={(v) => { setView(v); history.replaceState(null, "", v === "realtime" ? "#realtime" : location.pathname); }} />
+        </div>
       </header>
 
       <nav aria-label="เลือกสาขา" className="sticky top-0 z-10 -mx-4 mt-5 flex gap-2 overflow-x-auto bg-cream/90 px-4 py-3 backdrop-blur sm:mx-0 sm:px-0">
@@ -103,8 +109,10 @@ function Dashboard({ rows, branch, setBranch, view, setView }) {
           <Observations rows={rows} />
           <VerifyPanel rows={rows} />
         </>
-      ) : (
+      ) : view === "customers" ? (
         <CustomerSection salesRows={filtered} branch={branch} onSelectBranch={setBranch} />
+      ) : (
+        <RealtimeSection user={user} branch={branch} />
       )}
 
       <footer className="mt-10 border-t border-latte/60 pt-5 text-center text-xs text-roast/70">
@@ -291,5 +299,26 @@ function VerifyPanel({ rows }) {
         ))}
       </ul>
     </Card>
+  );
+}
+
+function AuthChip({ user }) {
+  const [error, setError] = useState("");
+  if (!firebaseReady || user === undefined) return null;
+  if (!user) {
+    return (
+      <button onClick={() => signInWithGoogle().catch((e) => setError(firebaseErrorText(e)))} title={error || undefined}
+        className="rounded-full border border-latte bg-white px-3 py-1 text-xs font-medium text-roast hover:bg-foam">
+        🔐 เข้าสู่ระบบด้วย Google{error && " ⚠️"}
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-latte bg-white py-1 pl-1 pr-3 text-xs text-roast">
+      {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="h-6 w-6 rounded-full" />
+        : <span className="grid h-6 w-6 place-items-center rounded-full bg-roast text-cream">{(user.displayName || "?")[0]}</span>}
+      <span className="max-w-40 truncate font-medium text-espresso">{user.displayName || user.email}</span>
+      <button onClick={logOut} className="ml-1 underline hover:text-espresso">ออกจากระบบ</button>
+    </div>
   );
 }

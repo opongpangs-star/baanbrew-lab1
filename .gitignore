@@ -6,3 +6,7 @@ dist
 # ห้าม commit service account key ของ Firebase เด็ดขาด
 *-firebase-adminsdk-*.json
 serviceAccount*.json
+!.env.example
+*service-account*.json
+*serviceaccount*.json
+.firebase/

@@ -1,4 +1,4 @@
-# ☕ บ้านบรู Dashboard — Lab 1 + การบ้าน Lab 2.1
+# ☕ บ้านบรู Dashboard — Lab 1 · Lab 2.1 · Lab 3
 
 Dashboard ยอดขายร้านกาแฟ "บ้านบรู" 5 สาขา (1 เม.ย. 2568 – 20 ก.ย. 2569)
 งาน Lab 1 วิชา Basic Data Analytics and Data Visualization using AI Vibe Coding
@@ -88,3 +88,38 @@ node verify.mjs  # พิมพ์ตัวเลขสำหรับตรว�
 ตัวทำความสะอาดรองรับข้อมูลดิบที่เลอะด้วย (ปี พ.ศ., DD/MM/YYYY, ช่องว่าง, คำพ้องเพศ/อายุ, แถวซ้ำ, รหัสซ้ำ, เบอร์ไม่ปิดบัง) — ทดสอบกับไฟล์ทดสอบที่ใส่ปัญหาเหล่านี้แล้ว ถ้ามี `customers.csv` ต้นฉบับจากคอร์ส ให้อัปโหลดในแถบ Files ของ Colab แล้ว Run all
 
 **บน Dashboard:** สลับไปที่แท็บ **👥 ลูกค้า** — ผล profiling, KPI ลูกค้า, สมาชิกใหม่รายเดือน (เดือนสุดท้ายที่ไม่ครบเดือนแสดงเป็นแท่งจาง), สมาชิกแยกสาขา ซื้อแล้ว/ยังไม่ซื้อ, กลุ่มอายุ × เพศ, ยอดซื้อเฉลี่ยตามกลุ่มอายุ และข้อสังเกต 4 ข้อ (กรองตามสาขาได้)
+
+---
+
+## การบ้านที่ 3 — Lab 3: Firebase real-time + Login + ขึ้นเว็บ
+
+เปิดแท็บ **⚡ Real-time** (หรือ [ลิงก์ตรง](https://opongpangs-star.github.io/baanbrew-lab1/#realtime)) แล้วกด **เข้าสู่ระบบด้วย Google**
+
+| Lab | ทำอะไร | ไฟล์ |
+|---|---|---|
+| 3.1 สร้าง Firebase project + นำข้อมูลเข้า | project `baanbrew-dash-2569` · นำเข้า 3 เดือนล่าสุด **9,932 เอกสาร** (21 มิ.ย.–20 ก.ย. 69, ยอดรวม ฿847,043) ด้วย firebase-admin, batch ละ 500, document id = `order_id-product_id` (รันซ้ำไม่เกิดข้อมูลซ้ำ), เพิ่ม `date` `hour` `revenue` | [`scripts/seed-firestore.mjs`](scripts/seed-firestore.mjs) |
+| 3.2 Dashboard real-time + ฟอร์ม | อ่านด้วย `onSnapshot` + cleanup ใน `useEffect`, ตัวกรองช่วงวันที่ (7/30 วัน/ทั้งหมด/เลือกเอง) และสาขา, สถานะกำลังโหลด/ไม่มีข้อมูล, ฟอร์มบันทึกยอดขาย (เมนูจาก `products.csv` ราคาใส่อัตโนมัติ), รายการล่าสุดอัปเดตเอง | [`src/components/RealtimeSection.jsx`](src/components/RealtimeSection.jsx) |
+| 3.3 Login + Security Rules + ขึ้นเว็บ | Google sign-in, ซ่อน Dashboard real-time ถ้ายังไม่ล็อกอิน, rules บังคับฝั่งเซิร์ฟเวอร์, ขึ้นเว็บบน GitHub Pages (เพิ่มโดเมนใน Authorized domains แล้ว) | [`firestore.rules`](firestore.rules), [`src/lib/firebase.js`](src/lib/firebase.js) |
+
+### Security Rules — ทดสอบกับฐานข้อมูลจริงแล้ว ผ่าน 14/14 ข้อ (`npm run test:rules`)
+
+| กรณี | ผล |
+|---|---|
+| ยังไม่ล็อกอิน: อ่าน / เพิ่ม | ❌ ปฏิเสธ / ❌ ปฏิเสธ |
+| ล็อกอินแล้ว: อ่าน / เพิ่มยอดขายที่ถูกต้อง | ✅ อนุญาต / ✅ อนุญาต |
+| qty = -5, 0, 1.5 | ❌ ปฏิเสธ |
+| revenue ≠ qty × ราคา · สาขาที่ไม่มีจริง · field แปลกปลอม | ❌ ปฏิเสธ |
+| บันทึกในชื่อคนอื่น (`created_by` ไม่ใช่ uid ตัวเอง) | ❌ ปฏิเสธ |
+| แก้ไข / ลบรายการ · เขียน collection อื่น | ❌ ปฏิเสธ |
+
+### ความลับ
+- Firebase web config (`VITE_FIREBASE_*`) อยู่ใน `.env.local` — เปิดเผยในหน้าเว็บได้ตามการออกแบบของ Firebase ความปลอดภัยจริงคือ Security Rules
+- Service account key เก็บไว้ **นอก repo** อ้างอิงผ่าน `SERVICE_ACCOUNT_PATH` ใน `.env.local` · `.gitignore` กันไฟล์ key และ `.env.local` ไว้แล้ว — ไม่มี key อยู่ใน GitHub
+
+### คำสั่ง
+```bash
+npm run seed        # นำเข้าข้อมูลเข้า Firestore (ต้องมี .env.local + key)
+npm run test:rules  # ทดสอบ Security Rules กับฐานข้อมูลจริง
+npx firebase-tools deploy --only firestore:rules
+npm run deploy      # build + ขึ้น GitHub Pages
+```

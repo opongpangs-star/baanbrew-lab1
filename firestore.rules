@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// Lab 3.3 — Security Rules ของ Baanbrew Dashboard
+// หลักการ: ต้องล็อกอินจึงอ่านได้ · เพิ่มยอดขายได้เฉพาะข้อมูลที่ถูกต้อง · แก้/ลบจากหน้าเว็บไม่ได้เลย
+// (ข้อมูลตั้งต้นนำเข้าด้วย firebase-admin ซึ่งข้าม rules นี้ได้ เพราะเป็นสิทธิ์ผู้ดูแลระบบ)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /sales/{saleId} {
+      // อ่าน: ต้องล็อกอินด้วย Google ก่อน
+      allow read: if request.auth != null;
+
+      // เพิ่ม: ต้องล็อกอิน + ข้อมูลผ่านการตรวจทุกข้อ (กันคนยิงข้อมูลแปลก ๆ จาก console ของเบราว์เซอร์)
+      allow create: if request.auth != null && validSale(request.resource.data);
+
+      // แก้ไข/ลบ: ปิดทั้งหมดจากหน้าเว็บ
+      allow update, delete: if false;
+    }
+
+    // collection อื่นทั้งหมด: ปิด
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function validSale(d) {
+      return d.keys().hasOnly(['order_id', 'date', 'hour', 'branch', 'product_id', 'qty', 'unit_price',
+                               'revenue', 'customer_id', 'payment_method', 'channel', 'source',
+                               'created_by', 'created_by_name', 'created_at'])
+        && d.qty is int && d.qty > 0 && d.qty <= 50                       // จำนวนต้องมากกว่า 0 (ตามโจทย์) และไม่เกิน 50 แก้ว
+        && d.unit_price is number && d.unit_price > 0 && d.unit_price <= 500
+        && d.revenue == d.qty * d.unit_price                              // ยอดขายต้องคำนวณตรงกับ qty × ราคา
+        && d.branch in ['สยาม', 'สีลม', 'อารีย์', 'บางนา', 'มหาวิทยาลัย']
+        && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.hour is int && d.hour >= 0 && d.hour <= 23
+        && d.product_id is string && d.product_id.matches('^P[0-9]{3}$')
+        && d.source == 'web'
+        && d.created_by == request.auth.uid                               // บันทึกได้ในชื่อตัวเองเท่านั้น
+        && d.created_at == request.time;                                  // เวลาบันทึกต้องมาจากเซิร์ฟเวอร์
+    }
+  }
+}
